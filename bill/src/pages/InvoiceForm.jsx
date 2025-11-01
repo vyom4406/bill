@@ -1,6 +1,27 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useSelector, useDispatch } from "react-redux";
+import { useNavigate } from "react-router-dom";
+import { logout } from "../redux/authSlice";
+import * as bootstrap from "bootstrap";
 
 export default function InvoiceForm() {
+  const { token } = useSelector((state) => state.auth);
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!token) {
+      navigate("/");
+    }
+  }, [token, navigate]);
+
+  if (!token) return null;
+
+  const handleLogout = () => {
+    dispatch(logout());
+    navigate("/");
+  };
+
   const [form, setForm] = useState({
     companyName: "3MXYZ",
     companyAddress: "3MXYZ, CFVGB, KARNATAKA, KARNATAKA, 560023",
@@ -43,7 +64,56 @@ export default function InvoiceForm() {
     setItems(updated);
   };
 
-  const handlePrint = () => window.print();
+  const handlePrint = () => {
+  const modalEl = document.getElementById("invoicePreview");
+  const modalInstance = bootstrap.Modal.getInstance(modalEl);
+
+  // Prevent duplicate triggers by disabling the print button temporarily
+  const printBtn = modalEl.querySelector(".btn-success");
+  printBtn.disabled = true;
+
+  // Hide the modal first
+  modalInstance.hide();
+
+  // Wait until modal is fully hidden before printing
+  modalEl.addEventListener(
+    "hidden.bs.modal",
+    () => {
+      const printContents = document.getElementById("invoice-print-area").innerHTML;
+      const printWindow = window.open("", "", "width=900,height=700");
+
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>Invoice</title>
+            <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+            <style>
+              body { padding: 20px; font-size: 14px; }
+              table { width: 100%; border-collapse: collapse; }
+              th, td { border: 1px solid #ccc; padding: 6px; text-align: center; }
+              h3 { margin-bottom: 20px; }
+            </style>
+          </head>
+          <body>
+            ${printContents}
+          </body>
+        </html>
+      `);
+
+      printWindow.document.close();
+
+      // ✅ Ensure print runs only once
+      printWindow.focus();
+      printWindow.print();
+      printWindow.onafterprint = () => printWindow.close();
+
+      // Re-enable the print button
+      printBtn.disabled = false;
+    },
+    { once: true } // ensures this event fires only once
+  );
+};
+
 
   const totalBeforeTax = items.reduce(
     (sum, item) => sum + item.qty * item.rate,
@@ -55,6 +125,11 @@ export default function InvoiceForm() {
 
   return (
     <div className="container my-5">
+      <div className="text-end mb-3">
+        <button className="btn btn-outline-danger" onClick={handleLogout}>
+          Logout
+        </button>
+      </div>
       <div className="card shadow p-4">
         <h2 className="text-center mb-4">Invoice Generator</h2>
 
@@ -295,7 +370,7 @@ export default function InvoiceForm() {
               <h5 className="modal-title">Invoice Preview</h5>
               <button type="button" className="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div className="modal-body">
+            <div className="modal-body" id="invoice-print-area">
               <div className="text-center mb-3">
                 <h3 className="fw-bold">TAX INVOICE</h3>
                 <p className="m-0">{form.companyName}</p>
